@@ -82,7 +82,7 @@ class PauseAndCapture(Node):
                 # Source frame (the point cloud's original frame)
                 scan_msg.header.frame_id,
                 # Timestamp of the scan message to ensure proper time synchronization
-                rclpy.time.Time(),
+                rclpy.time.Time.from_msg(scan_msg.header.stamp),
                 # Timeout of 0.5 seconds to wait for the transform
                 timeout=rclpy.duration.Duration(seconds=0.5)
             )
@@ -95,9 +95,9 @@ class PauseAndCapture(Node):
         except TransformException as ex:
             self.get_logger().warn(f"Transform failed after delay: {str(ex)}")
 
-    # -------------------- TODO -------------------- #
     def transform_pointcloud2(self, cloud_msg, transform):
         """Transform a point cloud using Euler angles from a given quaternion."""
+
 
         # Helper function to convert quaternion to Euler angles (roll, pitch, yaw)
         def quaternion_to_euler(q):
@@ -114,31 +114,42 @@ class PauseAndCapture(Node):
 
         # pylint: disable=too-many-positional-arguments
         # pylint: disable=too-many-arguments
-        def rotate_point_euler(x, y, z, roll, pitch, yaw) -> tuple[int, int, int]:
-            pass
+        def rotate_point_euler(x, y, z, roll, pitch, yaw):
+            cph, ct, cps = np.cos(roll), np.cos(pitch), np.cos(yaw)
+            sph, st, sps = np.sin(roll), np.sin(pitch), np.sin(yaw)
 
+            R = np.array([
+                [cps*ct, cps*sph*st - cph*sps, sph*sps + cph*cps*st],
+                [ct*sps, cph*cps + sph*sps*st, cph*sps*st - cps*sph],
+                [-st, ct*sph, cph*ct]
+            ])
 
+            new_x, new_y, new_z = R @ np.array([x, y, z]).T
 
-        # Extract translation and rotation (quaternion) from the transform
-        ...
+            return new_x, new_y, new_z
+
+        # Extract translation and rotation from the transform
+        t = transform.transform.translation
+        q = transform.transform.rotation
 
         # Convert quaternion to Euler angles (roll, pitch, yaw)
-        ...
+        roll, pitch, yaw = quaternion_to_euler(q)
 
         # Transform the point cloud using Euler rotation
         transformed_points = []
         for pt in pc2.read_points(cloud_msg, field_names=("x", "y", "z"), skip_nans=True):
             x, y, z = pt
 
-            #TODO:
             # Apply rotation to the point using Euler angles use the rotate point euler function
-            ...
+            new_x, new_y, new_z = rotate_point_euler(x, y, z, roll, pitch, yaw)
 
-            #TODO:
             # Apply translation to the rotated point using the variable t
-            ...
+            new_x += t.x
+            new_y += t.y
+            new_z += t.z
+
             # Append transformed point
-            ...
+            transformed_points.append((new_x, new_y, new_z))
 
         return transformed_points
 
