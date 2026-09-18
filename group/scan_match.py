@@ -34,15 +34,15 @@ class PauseAndCapture(Node):
 
         # Set up the subscription for LaserScan message
         # HINT: Subscribe on the '/scan' topic
-        self.subscription = ...
+        self.subscription = self.create_subscription(LaserScan, '/scan', self.scan_callback, 10)
 
         # Create a publisher for PointCloud2 messages
         # HINT: Publish on the '/accumulated_cloud' topic
-        self.pc_pub = ...
+        self.pc_pub = self.create_publisher(PointCloud2, '/accumulated_cloud', 10)
 
         # Create a publisher for ICP merged cloud
         # HINT: Publish on the '/icp_merged_cloud' topic
-        self.icp_pub = ...
+        self.icp_pub = self.create_publisher(PointCloud2, '/icp_merged_cloud', 10)
 
         self.accumulated_points = []
         self.icp_accumulated_points = []
@@ -87,14 +87,14 @@ class PauseAndCapture(Node):
             # Perform a lookup to transform the point cloud from its original
             # frame to the 'odom' frame
             transform = self.tf_buffer.lookup_transform(
-                ..., # Target frame (where do you want to transform to?)
+                'odom', # Target frame (where do you want to transform to?)
                 ...,# Source frame (the point cloud's original frame)
                 ...,  # Timestamp of the scan message to ensure proper time synchronization
-                ...  # Timeout of 0.5 seconds to wait for the transform
+                help  # Timeout of 0.5 seconds to wait for the transform
             )
 
             # Transform the point cloud with the transform_pointcloud2 function
-            transformed_points = ...
+            transformed_points = transform_pointcloud2(self, )
 
             if self.icp_accumulated_points:
                 icp_aligned = self.perform_icp(self.icp_accumulated_points, transformed_points)
@@ -118,7 +118,7 @@ class PauseAndCapture(Node):
 
 
     #TODO: Complete the rotate_point_euler in transform_pointcloud2 functions
-    #Note that ros inherently processes point clouds in 3d
+    # Note that ros inherently processes point clouds in 3d
     # even though the robot's point cloud is in 2d.
 
     def transform_pointcloud2(self, cloud_msg: PointCloud2, transform: TransformStamped)\
@@ -129,36 +129,46 @@ class PauseAndCapture(Node):
         # pylint: disable=too-many-arguments
         def rotate_point_euler(x, y, z, roll, pitch, yaw) -> tuple[int, int, int]:
             """Rotate a point (x, y, z) using Euler angles (roll, pitch, yaw)."""
-            #TODO:
-            #using the roll,pitch and yaw construct the Rx , Ry, Rz matrix
+            # Using the roll, pitch and yaw construct the Rx, Ry, Rz matrix
+            Rx = np.array([[1, 0, 0], 
+                           [0, np.cos(roll), -np.sin(roll)], 
+                           [0, np.sin(roll), np.cos(roll)]]) 
+            Ry = np.array([[np.cos(pitch), 0, np.sin(pitch)], 
+                           [0, 1, 0],
+                           [-np.sin(pitch), 0, np.cos(pitch)]])
+            Rz = np.array([[np.cos(yaw), -np.sin(yaw), 0], 
+                           [np.sin(yaw), np.cos(yaw), 0], 
+                           [0, 0, 1]]) 
 
-            #TODO:
             # Combined rotation matrix
+            Rtot = Rz @ Ry @ Rx
 
-            #TODO:
             # Apply the rotation to the point
+            result = Rtot @ np.array[x, y, z]
 
-            return ...
+            return tuple[result] 
 
 
         # Extract translation and rotation (quaternion) from the transform method
-        ...
+        trans = transform.transform.translation
+        rot = transform.transform.rotation
+        quat = [rot.x, rot.y, rot.z, rot.w]  # tf_transformations wants x,y,z,w
 
         # Convert quaternion to Euler angles (roll, pitch, yaw)
         # Hint: Use the euler_from_quaternion
-        ...
+        (roll, pitch, yaw) = euler_from_quaternion(quat)
 
         # Transform the point cloud using Euler rotation
         transformed_points = []
         for pt in pc2.read_points(cloud_msg, field_names=("x", "y", "z"), skip_nans=True):
             # Get values of pt
-            ...
+            x, y, z = float(pt[0]), float(pt[1]), float(pt[2])
 
-            #TODO:
             # Apply rotation to the point using Euler angles use the rotate point euler function
+            (tx, ty, tz) = rotate_point_euler(x, y, z, roll, pitch, yaw)
 
             # Append transformed point
-            transformed_points.append((...))
+            transformed_points.append((tx + trans.x, ty + trans.y, tz + trans.z))
 
         return transformed_points
 
@@ -188,16 +198,26 @@ class PauseAndCapture(Node):
         # 11. Compute mean error and check for convergence
         # 12. If converged, break the loop
 
-        ...
+        target_kdtree = cKDTree(tgt) # KDTree for target cloud 
+
+        for i in range(0, max_iterations): 
+            f
+
 
         return src.tolist()
 
 
     # Curr = Source, Prev = Target
     def svd_estimation(self, previous_points, current_points):
-        """Cacluates matrices for U, V_T, and Sigma"""
-        ...
-
+        """Calculates matrices for U, V_T, and Sigma"""
+        # centering both point sets  
+        src_centered = current_points - np.mean(current_points, axis=0)
+        tgt_centered = previous_points - np.mean(previous_points, axis=0)
+        # form the cross-covariance  
+        H = src_centered.T @ tgt_centered
+        # take SVD 
+        U, S, V_T = np.linalg.svd(H)
+        return U, S, V_T
 
 
 
