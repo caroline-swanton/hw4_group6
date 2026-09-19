@@ -144,9 +144,9 @@ class PauseAndCapture(Node):
             Rtot = Rz @ Ry @ Rx
 
             # Apply the rotation to the point
-            result = Rtot @ np.array[x, y, z]
+            result = Rtot @ np.array([x, y, z])
 
-            return tuple[result] 
+            return tuple(result) 
 
 
         # Extract translation and rotation (quaternion) from the transform method
@@ -198,11 +198,30 @@ class PauseAndCapture(Node):
         # 11. Compute mean error and check for convergence
         # 12. If converged, break the loop
 
-        target_kdtree = cKDTree(tgt) # KDTree for target cloud 
+        tgt_kdtree = cKDTree(tgt) # KDTree for target cloud 
 
-        for i in range(0, max_iterations): 
-            f
+        for _ in range(0, max_iterations): 
+            # find nearest neighbors (idk what is going on here) 
+            distances, indices = tgt_kdtree.query(src)
+            matched_tgt = tgt[indices]
 
+            # svd
+            U, _, V_T = self.svd_estimation(matched_tgt, src)
+
+            # rotation 
+            R = V_T.T @ U.T
+
+            # translation 
+            src_centroid = np.mean(src, axis=0)
+            tgt_centroid = np.mean(matched_tgt, axis=0)
+            t = tgt_centroid - R @ src_centroid
+
+            # apply transformation
+            src = (R @ src.T).T + t
+
+            E = np.mean(distances ** 2) # compute mean squared error 
+            if (E < tolerance): # check for convergence 
+                break
 
         return src.tolist()
 
@@ -210,14 +229,17 @@ class PauseAndCapture(Node):
     # Curr = Source, Prev = Target
     def svd_estimation(self, previous_points, current_points):
         """Calculates matrices for U, V_T, and Sigma"""
+        # compute centroids
+        src_centroid = np.mean(current_points, axis=0)
+        tgt_centroid = np.mean(previous_points, axis=0) 
+
         # centering both point sets  
-        src_centered = current_points - np.mean(current_points, axis=0)
-        tgt_centered = previous_points - np.mean(previous_points, axis=0)
-        # form the cross-covariance  
-        H = src_centered.T @ tgt_centered
-        # take SVD 
-        U, S, V_T = np.linalg.svd(H)
-        return U, S, V_T
+        src_centered = current_points - src_centroid
+        tgt_centered = previous_points - tgt_centroid 
+ 
+        H = src_centered.T @ tgt_centered # form the cross-covariance 
+        U, S, V_T = np.linalg.svd(H) # take SVD 
+        return (U, S, V_T)
 
 
 
