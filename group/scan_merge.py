@@ -207,7 +207,7 @@ class PauseAndCapture(Node):
         # find translation_vector
         source_centroid_mat = source_centroid[:, np.newaxis]
         target_centroid_mat = target_centroid[:, np.newaxis]
-        translation_vector = source_centroid_mat - (rotation_matrix @ target_centroid_mat)
+        translation_vector = source_centroid_mat - (rotation_matrix @ target_centroid_mat)   
 
         return rotation_matrix, translation_vector
 
