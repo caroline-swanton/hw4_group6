@@ -240,6 +240,7 @@ class PauseAndCapture(Node):
         H = src_centered.T @ tgt_centered # form the cross-covariance 
         U, S, V_T = np.linalg.svd(H) # take SVD 
         return (U, S, V_T)
+        # rotation and translation done in perform_cip
 
 
 
