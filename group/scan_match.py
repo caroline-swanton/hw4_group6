@@ -88,13 +88,13 @@ class PauseAndCapture(Node):
             # frame to the 'odom' frame
             transform = self.tf_buffer.lookup_transform(
                 'odom', # Target frame (where do you want to transform to?)
-                ...,# Source frame (the point cloud's original frame)
-                ...,  # Timestamp of the scan message to ensure proper time synchronization
-                help  # Timeout of 0.5 seconds to wait for the transform
+                scan_msg.header.frame_id,# Source frame (the point cloud's original frame)
+                rclpy.time.Time.from_msg(scan_msg.header.stamp),  # Timestamp of the scan message to ensure proper time synchronization
+                timeout=rclpy.duration.Duration(seconds=0.5)  # Timeout of 0.5 seconds to wait for the transform
             )
 
             # Transform the point cloud with the transform_pointcloud2 function
-            transformed_points = transform_pointcloud2(self, )
+            transformed_points = self.transform_pointcloud2(self, cloud_in_laser, transform)
 
             if self.icp_accumulated_points:
                 icp_aligned = self.perform_icp(self.icp_accumulated_points, transformed_points)

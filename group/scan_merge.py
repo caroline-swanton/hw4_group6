@@ -30,11 +30,11 @@ class PauseAndCapture(Node):
         qos_profile = QoSProfile(depth=10, reliability=QoSReliabilityPolicy.SYSTEM_DEFAULT)
         # Set up the subscription for LaserScan message
         # HINT: Publish on the '/scan' topic
-        self.subscription = ...
+        self.subscription = self.create_subscription(LaserScan, '/scan', self.scan_callback, qos_profile)
 
         # Create a publisher for PointCloud2 messages
         # HINT: Publish on the '/accumulated_cloud' topic
-        self.pc_pub = ...
+        self.pc_pub = self.create_publisher(PointCloud2, '/accumulated_cloud', qos_profile)
         self.accumulated_points = []
 
         self.capture_enabled = False
