@@ -130,21 +130,21 @@ class PauseAndCapture(Node):
         def rotate_point_euler(x, y, z, roll, pitch, yaw) -> tuple[int, int, int]:
             """Rotate a point (x, y, z) using Euler angles (roll, pitch, yaw)."""
             # Using the roll, pitch and yaw construct the Rx, Ry, Rz matrix
-            Rx = np.array([[1, 0, 0], 
+            R_x = np.array([[1, 0, 0], 
                            [0, np.cos(roll), -np.sin(roll)], 
                            [0, np.sin(roll), np.cos(roll)]]) 
-            Ry = np.array([[np.cos(pitch), 0, np.sin(pitch)], 
+            R_y = np.array([[np.cos(pitch), 0, np.sin(pitch)], 
                            [0, 1, 0],
                            [-np.sin(pitch), 0, np.cos(pitch)]])
-            Rz = np.array([[np.cos(yaw), -np.sin(yaw), 0], 
+            R_z = np.array([[np.cos(yaw), -np.sin(yaw), 0], 
                            [np.sin(yaw), np.cos(yaw), 0], 
                            [0, 0, 1]]) 
 
             # Combined rotation matrix
-            Rtot = Rz @ Ry @ Rx
+            R_tot = R_z @ R_y @ R_x
 
             # Apply the rotation to the point
-            result = Rtot @ np.array([x, y, z])
+            result = R_tot @ np.array([x, y, z])
 
             return tuple(result) 
 
