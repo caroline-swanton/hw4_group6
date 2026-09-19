@@ -169,6 +169,48 @@ class PauseAndCapture(Node):
         self.pc_pub.publish(cloud_msg)
         self.get_logger().info("Published accumulated cloud.")
 
+    def svd_estimation(self, source_points, target_points):
+        """Estimates optimal translation and rotation matrices"""
+        # ASSUMES source_points AND target_points ARE THE SAME LENGTH,
+        # AND THAT CORRESPONDENCE HAS ALREADY BEEN FOUND
+
+        # calculate point cloud centroids
+        points_sum_source = np.zeroes(3)
+        n_source = 0
+        for point in source_points:
+            points_sum_source = points_sum_source + point
+            n_source += 1
+        source_centroid = points_sum_source / n_source
+        points_sum_target = np.zeroes(3)
+        n_source = 0
+        for point in target_points:
+            points_sum_target = points_sum_target + point
+            n_target += 1
+        target_centroid = points_sum_target / n_target
+
+        # compute covariance matrix
+        h_mat = np.zeroes(3, 3) # initialize
+        for i in range(n_source):
+            source_p = source_points[i] - source_centroid
+            target_q = target_points[i] - target_centroid
+            p_mat = source_p[:, np.newaxis]
+            q_mat = (source_p[:, np.newaxis]).T
+            h_step = p_mat @ q_mat
+            h_mat = h_mat + h_step
+
+        # SVD to recover rotation_matrix
+        u_mat, s_mat, vt_mat = np.linalg.svd(h_mat)
+        v_mat = vt_mat.T
+        ut_mat = u_mat.T
+        rotation_matrix = v_mat @ ut_mat
+
+        # find translation_vector
+        source_centroid_mat = source_centroid[:, np.newaxis]
+        target_centroid_mat = target_centroid[:, np.newaxis]
+        translation_vector = source_centroid_mat - (rotation_matrix @ target_centroid_mat)
+
+        return rotation_matrix, translation_vector
+
 def main(args=None):
     """Main function to spin ROS node"""
     rclpy.init(args=args)
