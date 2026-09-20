@@ -53,12 +53,13 @@ class DataParser:
                 if line.startswith("# Time:"):
                     timestamp_ = float(line.split(":")[1].strip())
                 elif line.startswith("nav_msgs.msg.Odometry("):
-                    pos_match = re.search(r"position=geometry_msgs\.msg\.Point\
-                                          (x=([-\de.E]+), y=([-\de.E]+)", line)
+                    pos_match = re.search(
+                        r"position=geometry_msgs\.msg\.Point\(x=([-\de.E]+), y=([-\de.E]+)", line
+                        )
                     ori_match = re.search(
-                        r"orientation=geometry_msgs\.msg\.Quaternion\(x=[-\de.E]+, \
-                         y=[-\de.E]+, z=([-\de.E]+), w=([-\de.E]+)",
-                        line)
+                        r"orientation=geometry_msgs\.msg\.Quaternion\(x=[-\de.E]+, y=[-\de.E]+, z=([-\de.E]+), w=([-\de.E]+)",
+                        line
+                        )
                     if pos_match and ori_match and timestamp_ is not None:
                         x_ = float(pos_match.group(1))
                         y_ = float(pos_match.group(2))
@@ -91,9 +92,11 @@ class DataParser:
         for entry in entries[1:]:
             time_match = re.search(r'(\d+\.\d+)', entry)
             scan_match = re.search(
-                r'angle_min=([\-\d.e]+), angle_max=([\-\d.e]+), \
-                    angle_increment=([\-\d.e]+),.*?ranges=\[(.*?)\]', entry,
-                re.DOTALL)
+                    r'angle_min=([\-\d.e]+), angle_max=([\-\d.e]+), '
+                    r'angle_increment=([\-\d.e]+),.*?ranges=\[(.*?)\]',
+                    entry,
+                    re.DOTALL
+                    )
             if time_match and scan_match:
                 angle_min_ = float(scan_match.group(1))
                 angle_max_ = float(scan_match.group(2))
@@ -116,7 +119,7 @@ class Point2PlaneICP:
         self.skip_pose = skip_pose
         self.accumulated_points = []
         # set this to true to visualize the normals
-        self.visualize_normal = True
+        self.visualize_normal = False
         # use this to switch between a simple and more robust normal estimation
         self.normal_simple = True
 
@@ -199,7 +202,7 @@ class Point2PlaneICP:
             norm_true = self.align_normal(points[i], norm_candidate, sensor_origin)
             normals.append(norm_true)
         # handle normals[n]
-        norm_candidate_n = self.points_to_normal(points[n - 2], points[n])
+        norm_candidate_n = self.points_to_normal(points[n - 3], points[n-1])
         norm_true_n = self.align_normal(points[n - 1], norm_candidate_n, sensor_origin)
         normals.append(norm_true_n)
         # visualize
@@ -303,6 +306,11 @@ class Point2PlaneICP:
             # src is Nx2, R is 2x2, t is 1x2
             src = (rotation_matrix @ src.T).T + translation_vector
 
+            if abs(theta) < 0.00001 and np.linalg.norm(translation_vector) < 0.00001:
+                print(f"number of iterations: {i + 1}")
+                print(f"final mean absolute residual: {np.mean(np.abs(b))}")
+                break
+
             # ----------------------- TBD-END -------------------
         return src
 
@@ -386,7 +394,7 @@ class Point2PlaneICP:
 
 
 if __name__ == "__main__":
-    path_ = "../data/" # change this to match your directory. note: '/' expected at the end
+    path_ = "data/" # change this to match your directory. note: '/' expected at the end
     parser = DataParser(odom_path=path_ + "odom_sync.txt", scan_path=path_ + "scan_sync.txt")
     parser.parse_odom()
     parser.parse_scan()
