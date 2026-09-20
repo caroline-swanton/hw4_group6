@@ -116,7 +116,7 @@ class Point2PlaneICP:
         self.skip_pose = skip_pose
         self.accumulated_points = []
         # set this to true to visualize the normals
-        self.visualize_normal = False
+        self.visualize_normal = True
         # use this to switch between a simple and more robust normal estimation
         self.normal_simple = True
 
@@ -145,6 +145,20 @@ class Point2PlaneICP:
         t = np.array([x, y])
         return (R @ points.T).T + t
 
+    def points_to_normal(self, prev_point, next_point):
+        """Helper function to calculate normal using central difference"""
+        tangent = next_point - prev_point
+        normal = [-tangent[1], tangent[0]]
+        normal = normal / np.linalg.norm(normal)
+        return normal
+
+    def align_normal(self, point, normal, sensor_origin):
+        """Helper function to align the normal towards the origin"""
+        to_sensor = sensor_origin - point
+        if np.dot(normal, to_sensor) < 0:
+            normal = -normal
+        return normal
+
     def compute_normals(self, points, sensor_origin):
 
         # --------------- TBD ---------------
@@ -156,7 +170,7 @@ class Point2PlaneICP:
         This is the simplest form of normals.
         A more sophisticated version is available under compute_normals_pca()
         using Principle Component Analysis
-            -Use this function to check if you normals looks similar
+            - Use this function to check if your normals looks similar
             - To use compute_normals_pca(), set self.normal_simple = False
 
         - for point cloud index from 0 to n,
@@ -174,10 +188,23 @@ class Point2PlaneICP:
         - visualize the normals using the function plot_normals()
             i.e enable self.visualize_normal under init()
          """
-        normals = []
-        for _ in range(...):
-            ...
-
+        normals = [] # initialize
+        n = len(points)
+        # handle normals[0]
+        norm_candidate_0 = self.points_to_normal(points[0], points[2])
+        norm_true_0 = self.align_normal(points[1], norm_candidate_0, sensor_origin)
+        normals.append(norm_true_0)
+        for i in range(1, n-1):
+            norm_candidate = self.points_to_normal(points[i - 1], points[i + 1])
+            norm_true = self.align_normal(points[i], norm_candidate, sensor_origin)
+            normals.append(norm_true)
+        # handle normals[n]
+        norm_candidate_n = self.points_to_normal(points[n - 2], points[n])
+        norm_true_n = self.align_normal(points[n - 1], norm_candidate_n, sensor_origin)
+        normals.append(norm_true_n)
+        # visualize
+        if self.visualize_normal:
+            self.plot_normals(points, normals)
         return np.array(normals)
 
     def compute_normals_pca(self, points, tree, sensor_origin, k=10):
@@ -225,12 +252,12 @@ class Point2PlaneICP:
 
         # ----------------------- TBD -------------------
         # pylint: disable=unpacking-non-sequence
-        for _ in range(max_iterations):
-            _, indices = ...  # use kd tree for initial association.
-            matched_pts = ...    # get the matched points from target PCL using the kd tree index
-            matched_normals = ...  # get the matched normals using the kd tree index
+        for i in range(max_iterations):
+            distances, indices = tree.query(src)  # use kd tree for initial association.
+            matched_pts = tgt[indices]    # get the matched points from target PCL using the kd tree index
+            matched_normals = normals[indices]  # get the matched normals using the kd tree index
             # pylint: disable=invalid-name
-            A, b = [], []
+            A, b = [], [] # initialize
             for p, q, n in zip(src, matched_pts, matched_normals):
                 # using δ, n (normals) form the parts of the linear system
                 # i.e. A and b as the system is Ax=b
@@ -241,7 +268,16 @@ class Point2PlaneICP:
                 # when working with vectors, use dot product where applicable
                 # Append A and b to the list
 
-                ...
+                # build A and b
+                residual = p - q
+                b_i = np.dot(-n, residual)
+                b.append(b_i)
+                nx = n[0]
+                ny = n[1]
+                px = p[0]
+                py = p[1]
+                a_i = [np.dot(n, [-py, px]), nx, ny]
+                A.append(a_i)
 
             # pylint: disable=invalid-name
             A = np.array(A)
@@ -255,7 +291,18 @@ class Point2PlaneICP:
             # alternatively form a homogeneous transformation matrix and transform the source
             # return source point cloud
 
-            ...
+            # get rotation and translation
+            x, lsq_residuals, rank, s = np.linalg.lstsq(A, b, rcond=None)
+            theta = x[0]
+            t_x = x[1]
+            t_y = x[2]
+            translation_vector = np.array([t_x, t_y])
+            rotation_matrix = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+
+            # apply transformation
+            # src is Nx2, R is 2x2, t is 1x2
+            src = (rotation_matrix @ src.T).T + translation_vector
+
             # ----------------------- TBD-END -------------------
         return src
 
