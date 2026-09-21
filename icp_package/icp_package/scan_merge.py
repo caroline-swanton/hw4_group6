@@ -1,5 +1,5 @@
 '''
-This node merges points from the Lidar laser scan with the 
+This node merges points from the Lidar laser scan with the
 transformation between accumulated and scanned points'''
 import math
 import threading
@@ -12,7 +12,7 @@ from sensor_msgs.msg import LaserScan, PointCloud2, PointField
 from std_msgs.msg import Header
 from laser_geometry import LaserProjection
 import tf2_ros
-from tf2_ros import TransformException
+from tf2_ros import TransformException  # pylint: disable=no-name-in-module
 import sensor_msgs_py.point_cloud2 as pc2
 import numpy as np
 
@@ -30,7 +30,8 @@ class PauseAndCapture(Node):
         qos_profile = QoSProfile(depth=10, reliability=QoSReliabilityPolicy.SYSTEM_DEFAULT)
         # Set up the subscription for LaserScan message
         # HINT: Publish on the '/scan' topic
-        self.subscription = self.create_subscription(LaserScan, '/scan', self.scan_callback, qos_profile)
+        self.subscription = self.create_subscription(
+            LaserScan, '/scan', self.scan_callback, qos_profile)
 
         # Create a publisher for PointCloud2 messages
         # HINT: Publish on the '/accumulated_cloud' topic
@@ -74,9 +75,8 @@ class PauseAndCapture(Node):
         try:
             cloud_in_laser = self.laser_projector.projectLaser(scan_msg)
 
-            #TODO:
             # Perform a lookup to transform the point cloud from its original
-            #frame to the 'odom' frame
+            # frame to the 'odom' frame
             transform = self.tf_buffer.lookup_transform(
                 'odom', # Target frame
                 # Source frame (the point cloud's original frame)
@@ -95,7 +95,7 @@ class PauseAndCapture(Node):
         except TransformException as ex:
             self.get_logger().warn(f"Transform failed after delay: {str(ex)}")
 
-    def transform_pointcloud2(self, cloud_msg, transform):
+    def transform_pointcloud2(self, cloud_msg, transform):  # pylint: disable=too-many-locals
         """Transform a point cloud using Euler angles from a given quaternion."""
 
 
@@ -112,9 +112,8 @@ class PauseAndCapture(Node):
         # of rotation matrices and apply them to the point
         # HINT: Yaw @ Pitch @ Roll
 
-        # pylint: disable=too-many-positional-arguments
         # pylint: disable=too-many-arguments
-        def rotate_point_euler(x, y, z, roll, pitch, yaw):
+        def rotate_point_euler(x, y, z, roll, pitch, yaw):  # pylint: disable=too-many-locals
             cph, ct, cps = np.cos(roll), np.cos(pitch), np.cos(yaw)
             sph, st, sps = np.sin(roll), np.sin(pitch), np.sin(yaw)
 

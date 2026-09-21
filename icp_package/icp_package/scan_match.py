@@ -1,9 +1,8 @@
 '''
 This node takes the laser scan from the Lidar and transforms
-it into a 2D point cloud, then calculates the transform via 
+it into a 2D point cloud, then calculates the transform via
 matched points, and then merges the new points with the existing cloud
 '''
-import math
 import threading
 import rclpy
 from rclpy.node import Node
@@ -14,10 +13,9 @@ from sensor_msgs.msg import LaserScan, PointCloud2, PointField
 from std_msgs.msg import Header
 from laser_geometry import LaserProjection
 import tf2_ros
-from tf2_ros import TransformException, TransformStamped
+from tf2_ros import TransformException, TransformStamped  # pylint: disable=no-name-in-module
 import sensor_msgs_py.point_cloud2 as pc2
 from scipy.spatial import cKDTree
-from geometry_msgs.msg import Quaternion
 from tf_transformations import euler_from_quaternion
 
 # pylint: disable=too-many-instance-attributes
@@ -30,11 +28,15 @@ class PauseAndCapture(Node):
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
         self.laser_projector = LaserProjection()
 
-        qos_profile = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE)
+        qos_profile = QoSProfile(
+            depth=10,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE)
 
         # Set up the subscription for LaserScan message
         # HINT: Subscribe on the '/scan' topic
-        self.subscription = self.create_subscription(LaserScan, '/scan', self.scan_callback, qos_profile)
+        self.subscription = self.create_subscription(
+            LaserScan, '/scan', self.scan_callback, qos_profile)
 
         # Create a publisher for PointCloud2 messages
         # HINT: Publish on the '/accumulated_cloud' topic
@@ -83,14 +85,15 @@ class PauseAndCapture(Node):
         try:
             cloud_in_laser = self.laser_projector.projectLaser(scan_msg)
 
-            #TODO:
             # Perform a lookup to transform the point cloud from its original
             # frame to the 'odom' frame
             transform = self.tf_buffer.lookup_transform(
-                'odom', # Target frame (where do you want to transform to?)
-                scan_msg.header.frame_id,# Source frame (the point cloud's original frame)
-                rclpy.time.Time.from_msg(scan_msg.header.stamp),  # Timestamp of the scan message to ensure proper time synchronization
-                timeout=rclpy.duration.Duration(seconds=0.5)  # Timeout of 0.5 seconds to wait for the transform
+                'odom',  # Target frame (where do you want to transform to?)
+                scan_msg.header.frame_id,  # Source frame (the cloud's original frame)
+                # Use the scan's timestamp for proper time synchronization
+                rclpy.time.Time.from_msg(scan_msg.header.stamp),
+                # Wait up to 0.5 seconds for the transform
+                timeout=rclpy.duration.Duration(seconds=0.5)
             )
 
             # Transform the point cloud with the transform_pointcloud2 function
@@ -114,31 +117,25 @@ class PauseAndCapture(Node):
         except TransformException as ex:
             self.get_logger().warn(f"Transform failed after delay: {str(ex)}")
 
-
-
-
-    #TODO: Complete the rotate_point_euler in transform_pointcloud2 functions
     # Note that ros inherently processes point clouds in 3d
     # even though the robot's point cloud is in 2d.
-
-    def transform_pointcloud2(self, cloud_msg: PointCloud2, transform: TransformStamped)\
-          -> list[tuple[int, int, int]]:
+    def transform_pointcloud2(self, cloud_msg: PointCloud2, transform: TransformStamped) \
+            -> list[tuple[float, float, float]]:
         """Transform a point cloud using Euler angles from a given quaternion."""
+        # pylint: disable=invalid-name,too-many-locals,too-many-arguments
 
-        # pylint: disable=too-many-positional-arguments
-        # pylint: disable=too-many-arguments
-        def rotate_point_euler(x, y, z, roll, pitch, yaw) -> tuple[int, int, int]:
+        def rotate_point_euler(x, y, z, roll, pitch, yaw) -> tuple[float, float, float]:
             """Rotate a point (x, y, z) using Euler angles (roll, pitch, yaw)."""
             # Using the roll, pitch and yaw construct the Rx, Ry, Rz matrix
-            R_x = np.array([[1, 0, 0], 
-                           [0, np.cos(roll), -np.sin(roll)], 
-                           [0, np.sin(roll), np.cos(roll)]]) 
-            R_y = np.array([[np.cos(pitch), 0, np.sin(pitch)], 
-                           [0, 1, 0],
-                           [-np.sin(pitch), 0, np.cos(pitch)]])
-            R_z = np.array([[np.cos(yaw), -np.sin(yaw), 0], 
-                           [np.sin(yaw), np.cos(yaw), 0], 
-                           [0, 0, 1]]) 
+            R_x = np.array([[1, 0, 0],
+                            [0, np.cos(roll), -np.sin(roll)],
+                            [0, np.sin(roll), np.cos(roll)]])
+            R_y = np.array([[np.cos(pitch), 0, np.sin(pitch)],
+                            [0, 1, 0],
+                            [-np.sin(pitch), 0, np.cos(pitch)]])
+            R_z = np.array([[np.cos(yaw), -np.sin(yaw), 0],
+                            [np.sin(yaw), np.cos(yaw), 0],
+                            [0, 0, 1]])
 
             # Combined rotation matrix
             R_tot = R_z @ R_y @ R_x
@@ -146,8 +143,7 @@ class PauseAndCapture(Node):
             # Apply the rotation to the point
             result = R_tot @ np.array([x, y, z])
 
-            return tuple(result) 
-
+            return tuple(result)
 
         # Extract translation and rotation (quaternion) from the transform method
         trans = transform.transform.translation
@@ -164,7 +160,7 @@ class PauseAndCapture(Node):
             # Get values of pt
             x, y, z = float(pt[0]), float(pt[1]), float(pt[2])
 
-            # Apply rotation to the point using Euler angles use the rotate point euler function
+            # Apply rotation to the point using the rotate_point_euler function
             (tx, ty, tz) = rotate_point_euler(x, y, z, roll, pitch, yaw)
 
             # Append transformed point
@@ -174,19 +170,13 @@ class PauseAndCapture(Node):
 
     def perform_icp(self, previous_points, current_points, max_iterations=20, tolerance=1e-4):
         """Main ICP loop to transform new points"""
+        # pylint: disable=invalid-name,too-many-locals
         src = np.array(current_points)
         tgt = np.array(previous_points)
 
-        ERROR = []
-        prev_error = float('inf')
-        prev_error = float(10000.0)
-        counter_ = 0
-
-        # Write the ICP loop here
-
         # Useful Steps to Follow For the Loop:
         # 1. Start icp loop for max_iterations
-        # 2. Build KDTree for target cloud, cKdtree from scipy
+        # 2. Build KDTree for target cloud, cKDTree from scipy
         # 3. Find nearest neighbors from source to tgt
         # 4. Compute centroids of matched source and target points
         # 5. Center both point clouds by subtracting their centroids
@@ -198,51 +188,47 @@ class PauseAndCapture(Node):
         # 11. Compute mean error and check for convergence
         # 12. If converged, break the loop
 
-        tgt_kdtree = cKDTree(tgt) # KDTree for target cloud 
+        tgt_kdtree = cKDTree(tgt)  # KDTree for target cloud
 
-        for _ in range(0, max_iterations): 
-            # find nearest neighbors (idk what is going on here) 
+        for _ in range(max_iterations):
+            # Find nearest neighbors from source to target
             distances, indices = tgt_kdtree.query(src)
             matched_tgt = tgt[indices]
 
-            # svd
+            # SVD estimation of the best-fit rotation
             U, _, V_T = self.svd_estimation(matched_tgt, src)
-
-            # rotation 
             R = V_T.T @ U.T
 
-            # translation 
+            # Translation from centroids
             src_centroid = np.mean(src, axis=0)
             tgt_centroid = np.mean(matched_tgt, axis=0)
             t = tgt_centroid - R @ src_centroid
 
-            # apply transformation
+            # Apply transformation
             src = (R @ src.T).T + t
 
-            E = np.mean(distances ** 2) # compute mean squared error 
-            if (E < tolerance): # check for convergence 
+            E = np.mean(distances ** 2)  # mean squared error
+            if E < tolerance:  # check for convergence
                 break
 
         return src.tolist()
 
-
     # Curr = Source, Prev = Target
     def svd_estimation(self, previous_points, current_points):
         """Calculates matrices for U, V_T, and Sigma"""
+        # pylint: disable=invalid-name
         # compute centroids
         src_centroid = np.mean(current_points, axis=0)
-        tgt_centroid = np.mean(previous_points, axis=0) 
+        tgt_centroid = np.mean(previous_points, axis=0)
 
-        # centering both point sets  
+        # centering both point sets
         src_centered = current_points - src_centroid
-        tgt_centered = previous_points - tgt_centroid 
- 
-        H = src_centered.T @ tgt_centered # form the cross-covariance 
-        U, S, V_T = np.linalg.svd(H) # take SVD 
+        tgt_centered = previous_points - tgt_centroid
+
+        H = src_centered.T @ tgt_centered  # form the cross-covariance
+        U, S, V_T = np.linalg.svd(H)  # take SVD
         return (U, S, V_T)
-        # rotation and translation done in perform_cip
-
-
+        # rotation and translation done in perform_icp
 
     def publish_accumulated_cloud(self, stamp):
         """Publishes the existing accumulated pointcloud"""
