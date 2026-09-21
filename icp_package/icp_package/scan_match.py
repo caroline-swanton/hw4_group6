@@ -123,6 +123,7 @@ class PauseAndCapture(Node):
             -> list[tuple[float, float, float]]:
         """Transform a point cloud using Euler angles from a given quaternion."""
         # pylint: disable=invalid-name,too-many-locals,too-many-arguments
+        # pylint: disable=too-many-positional-arguments
 
         def rotate_point_euler(x, y, z, roll, pitch, yaw) -> tuple[float, float, float]:
             """Rotate a point (x, y, z) using Euler angles (roll, pitch, yaw)."""

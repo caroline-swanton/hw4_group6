@@ -112,7 +112,7 @@ class PauseAndCapture(Node):
         # of rotation matrices and apply them to the point
         # HINT: Yaw @ Pitch @ Roll
 
-        # pylint: disable=too-many-arguments
+        # pylint: disable=too-many-arguments, too-many-positional-arguments
         def rotate_point_euler(x, y, z, roll, pitch, yaw):  # pylint: disable=too-many-locals
             cph, ct, cps = np.cos(roll), np.cos(pitch), np.cos(yaw)
             sph, st, sps = np.sin(roll), np.sin(pitch), np.sin(yaw)
