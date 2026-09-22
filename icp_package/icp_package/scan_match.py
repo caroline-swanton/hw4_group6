@@ -10,7 +10,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 
 import numpy as np
 from sensor_msgs.msg import LaserScan, PointCloud2, PointField
-from std_msgs.msg import Header
+from std_msgs.msg import Header, Float64
 from laser_geometry import LaserProjection
 import tf2_ros
 from tf2_ros import TransformException, TransformStamped  # pylint: disable=no-name-in-module
@@ -38,6 +38,11 @@ class PauseAndCapture(Node):
         self.subscription = self.create_subscription(
             LaserScan, '/scan', self.scan_callback, qos_profile)
 
+        # Subscription for complimentary filter 
+        self.fused_yaw = None
+        self.yaw_sub = self.create_subscription(
+            Float64, '/yaw/fused', self.yaw_callback, 10)
+
         # Create a publisher for PointCloud2 messages
         # HINT: Publish on the '/accumulated_cloud' topic
         self.pc_pub = self.create_publisher(PointCloud2, '/accumulated_cloud', 10)
@@ -63,6 +68,10 @@ class PauseAndCapture(Node):
         while True:
             input(">> Press Enter to capture scan: ")
             self.capture_enabled = True
+
+    def yaw_callback(self, msg):
+        """Stores the latest fused yaw"""
+        self.fused_yaw = msg.data
 
     def scan_callback(self, scan_msg: LaserScan):
         """Callback for Lidar data"""
@@ -155,6 +164,9 @@ class PauseAndCapture(Node):
         # Hint: Use the euler_from_quaternion
         (roll, pitch, yaw) = euler_from_quaternion(quat)
 
+        if self.fused_yaw is not None: # use yaw from complimentary filter
+            yaw = self.fused_yaw
+
         # Transform the point cloud using Euler rotation
         transformed_points = []
         for pt in pc2.read_points(cloud_msg, field_names=("x", "y", "z"), skip_nans=True):
@@ -190,6 +202,8 @@ class PauseAndCapture(Node):
         # 12. If converged, break the loop
 
         tgt_kdtree = cKDTree(tgt)  # KDTree for target cloud
+        error = np.inf
+        prev_error = np.inf
 
         for _ in range(max_iterations):
             # Find nearest neighbors from source to target
@@ -208,8 +222,9 @@ class PauseAndCapture(Node):
             # Apply transformation
             src = (R @ src.T).T + t
 
-            E = np.mean(distances ** 2)  # mean squared error
-            if E < tolerance:  # check for convergence
+            prev_error = error
+            error = np.mean(distances ** 2)  # mean squared error
+            if (abs(error - prev_error) < tolerance):  # check for convergence
                 break
 
         return src.tolist()
